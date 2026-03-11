@@ -43,8 +43,9 @@
 | 1 | users | 사용자 정보 |
 | 2 | health_records | 건강 기록 메인 |
 | 3 | health_entries | 시간대별 건강 데이터 |
-| 4 | daily_health_summary | 일별 집계 |
-| 5 | monthly_health_summary | 월별 집계 |
+| 4 | data_sources | 데이터 소스 정보 |
+| 5 | daily_health_summary | 일별 집계 |
+| 6 | monthly_health_summary | 월별 집계 |
 
 자세한 테이블 설계는 [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)를 참고하세요.
 
@@ -117,7 +118,27 @@
 
 ---
 
-### 3.4. daily_health_summary (일별 집계)
+### 3.4. data_sources (데이터 소스)
+
+| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
+|--------|------------|------|--------|------|
+| id | BIGINT | NO | AUTO_INCREMENT | 소스 ID (PK) |
+| record_id | BIGINT | NO | - | 레코드 ID (FK) |
+| mode | INT | YES | NULL | 데이터 수집 모드 |
+| product_name | VARCHAR(100) | YES | NULL | 제품명 |
+| product_vender | VARCHAR(100) | YES | NULL | 제조사 |
+| source_name | VARCHAR(100) | YES | NULL | 소스명 |
+| source_type | VARCHAR(50) | YES | NULL | 소스 타입 |
+| created_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 생성 시간 |
+
+**제약조건**
+- PRIMARY KEY: `id`
+- FOREIGN KEY: `record_id` REFERENCES `health_records(id)` ON DELETE CASCADE
+- INDEX: `record_id`
+
+---
+
+### 3.5. daily_health_summary (일별 집계)
 
 | 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
 |--------|------------|------|--------|------|
@@ -138,7 +159,7 @@
 
 ---
 
-### 3.5. monthly_health_summary (월별 집계)
+### 3.6. monthly_health_summary (월별 집계)
 
 | 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
 |--------|------------|------|--------|------|
@@ -169,11 +190,16 @@
 - 한 명의 사용자는 여러 개의 건강 엔트리를 가질 수 있음
 - 사용자 삭제 시 관련된 모든 엔트리 삭제 (CASCADE)
 
-### 4.3. health_records ↔ health_entries (1:N)
+### 4.3. health_records ↔ data_sources (1:1)
+- 하나의 건강 기록은 하나의 데이터 소스 정보를 가질 수 있음
+- 데이터 수집 기기 및 앱 정보 저장
+- 건강 기록 삭제 시 관련된 데이터 소스도 삭제 (CASCADE)
+
+### 4.4. health_records ↔ health_entries (1:N)
 - 하나의 건강 기록은 여러 개의 시간대별 엔트리를 가질 수 있음
 - 건강 기록 삭제 시 관련된 모든 엔트리 삭제 (CASCADE)
 
-### 4.4. 집계 테이블
+### 4.5. 집계 테이블
 - daily_health_summary: health_entries를 일별로 집계
 - monthly_health_summary: daily_health_summary를 월별로 집계
 - record_key로 논리적 연결 (외래키 제약 없음)
