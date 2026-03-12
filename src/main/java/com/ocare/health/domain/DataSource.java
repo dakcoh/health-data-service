@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -42,4 +43,16 @@ public class DataSource {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    public void update(Integer mode, String productName, String productVender, String sourceName, String sourceType) {
+        this.mode = mode;
+        this.productName = productName;
+        this.productVender = productVender;
+        this.sourceName = sourceName;
+        this.sourceType = sourceType;
+    }
 }

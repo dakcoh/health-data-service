@@ -29,6 +29,7 @@ public class HealthDataService {
     private final HealthRecordRepository healthRecordRepository;
     private final HealthEntryRepository healthEntryRepository;
     private final DataSourceRepository dataSourceRepository;
+    private final HealthSummaryService healthSummaryService;
     private final ObjectMapper objectMapper;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -64,19 +65,25 @@ public class HealthDataService {
             log.info("새 레코드 생성: {}", request.getRecordkey());
         }
 
-        // 2. DataSource 저장
+        // 2. DataSource 저장 또는 업데이트
         if (request.getData().getSource() != null) {
             HealthDataRequest.Source source = request.getData().getSource();
-            DataSource dataSource = DataSource.builder()
-                    .recordId(healthRecord.getId())
-                    .mode(source.getMode())
-                    .productName(source.getProduct() != null ? source.getProduct().getName() : null)
-                    .productVender(source.getProduct() != null ? source.getProduct().getVender() : null)
-                    .sourceName(source.getName())
-                    .sourceType(source.getType())
-                    .build();
+            
+            DataSource dataSource = dataSourceRepository.findByRecordId(healthRecord.getId())
+                    .orElse(DataSource.builder()
+                            .recordId(healthRecord.getId())
+                            .build());
+            
+            dataSource.update(
+                    source.getMode(),
+                    source.getProduct() != null ? source.getProduct().getName() : null,
+                    source.getProduct() != null ? source.getProduct().getVender() : null,
+                    source.getName(),
+                    source.getType()
+            );
+            
             dataSourceRepository.save(dataSource);
-            log.info("데이터 소스 저장: {}", source.getName());
+            log.info("데이터 소스 저장/업데이트: {}", source.getName());
         }
 
         // 3. HealthEntry 저장
@@ -98,6 +105,9 @@ public class HealthDataService {
 
         healthEntryRepository.saveAll(entries);
         log.info("{}개의 엔트리 저장 완료", entries.size());
+
+        // 4. Daily/Monthly 집계 업데이트
+        healthSummaryService.aggregateSummaries(request.getRecordkey(), entries);
     }
 
     @Transactional(readOnly = true)

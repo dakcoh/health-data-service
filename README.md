@@ -18,15 +18,33 @@
 
 - Input Data 변환 및 저장
 - 시간대별 건강 데이터 관리
-- 일별/월별 집계 기능
-- 사용자 인증 (이메일/패스워드)
+- 일별/월별 집계 자동 생성
+- 사용자 인증 (세션 기반)
+- 전역 예외 처리
 
 ### 1.2. 기술 스택
 
 - Java 17
-- Spring Boot
+- Spring Boot 3.x
 - Spring Data JPA
+- Spring Security
 - MySQL 8.0
+
+### 1.3. API 엔드포인트
+
+**인증 (AuthController)**
+- `POST /api/auth/signup` - 회원가입
+- `POST /api/auth/login` - 로그인
+- `POST /api/auth/logout` - 로그아웃
+- `GET /api/auth/me` - 현재 사용자 조회
+
+**건강 데이터 (HealthDataController)**
+- `POST /api/health/load/{fileName}` - JSON 파일 데이터 로드
+- `GET /api/health/entries` - 사용자별 건강 데이터 조회
+
+**집계 데이터 (HealthSummaryController)**
+- `GET /api/health/summary/daily/{recordKey}` - 일별 집계 조회
+- `GET /api/health/summary/monthly/{recordKey}` - 월별 집계 조회
 
 ---
 
@@ -130,11 +148,16 @@
 | source_name | VARCHAR(100) | YES | NULL | 소스명 |
 | source_type | VARCHAR(50) | YES | NULL | 소스 타입 |
 | created_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 생성 시간 |
+| updated_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 수정 시간 |
 
 **제약조건**
 - PRIMARY KEY: `id`
 - FOREIGN KEY: `record_id` REFERENCES `health_records(id)` ON DELETE CASCADE
 - INDEX: `record_id`
+
+**특징**
+- health_records와 1:1 관계
+- 동일 record_id로 재로드 시 UPDATE (중복 방지)
 
 ---
 
@@ -145,9 +168,9 @@
 | id | BIGINT | NO | AUTO_INCREMENT | 집계 ID (PK) |
 | record_key | VARCHAR(36) | NO | - | 레코드 고유 키 |
 | health_dt | DATE | NO | - | 집계 날짜 |
-| total_steps | DECIMAL(12,2) | NO | 0 | 총 걸음 수 |
-| total_calories | DECIMAL(12,2) | NO | 0 | 총 칼로리 |
-| total_distance | DECIMAL(12,5) | NO | 0 | 총 거리 |
+| steps | DECIMAL(12,2) | NO | 0 | 걸음 수 |
+| calories | DECIMAL(12,2) | NO | 0 | 칼로리 |
+| distance | DECIMAL(12,5) | NO | 0 | 거리 |
 | created_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 생성 시간 |
 | updated_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 수정 시간 |
 
@@ -166,9 +189,9 @@
 | id | BIGINT | NO | AUTO_INCREMENT | 집계 ID (PK) |
 | record_key | VARCHAR(36) | NO | - | 레코드 고유 키 |
 | health_dt | VARCHAR(7) | NO | - | 집계 년월 (YYYY-MM) |
-| total_steps | DECIMAL(12,2) | NO | 0 | 총 걸음 수 |
-| total_calories | DECIMAL(12,2) | NO | 0 | 총 칼로리 |
-| total_distance | DECIMAL(12,5) | NO | 0 | 총 거리 |
+| steps | DECIMAL(12,2) | NO | 0 | 걸음 수 |
+| calories | DECIMAL(12,2) | NO | 0 | 칼로리 |
+| distance | DECIMAL(12,5) | NO | 0 | 거리 |
 | created_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 생성 시간 |
 | updated_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | 수정 시간 |
 
@@ -201,5 +224,7 @@
 
 ### 4.5. 집계 테이블
 - daily_health_summary: health_entries를 일별로 집계
-- monthly_health_summary: daily_health_summary를 월별로 집계
+- monthly_health_summary: health_entries를 월별로 집계
 - record_key로 논리적 연결 (외래키 제약 없음)
+- 데이터 로드 시 자동으로 집계 생성/업데이트
+- 동일 날짜/월에 대해 재로드 시 누적 집계
