@@ -17,10 +17,14 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
 
-  # 세션 설정
-  session:
-    timeout: 1800  # 30분 (초 단위)
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
 
-# 비밀번호 암호화 설정
+  session:
+    store-type: redis
+    timeout: 1800s
+
 password:
   secret: health

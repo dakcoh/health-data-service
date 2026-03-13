@@ -28,7 +28,9 @@
 - Spring Boot 3.x
 - Spring Data JPA
 - Spring Security
+- Spring Session Redis
 - MySQL 8.0
+- Redis (세션 저장소 & Write-Behind 버퍼)
 
 ### 1.3. API 엔드포인트
 
