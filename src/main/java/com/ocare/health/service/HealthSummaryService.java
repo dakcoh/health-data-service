@@ -24,6 +24,7 @@ public class HealthSummaryService {
 
     private final DailyHealthSummaryRepository dailyHealthSummaryRepository;
     private final MonthlyHealthSummaryRepository monthlyHealthSummaryRepository;
+    private final RedisCacheService redisCacheService;
 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
@@ -85,12 +86,40 @@ public class HealthSummaryService {
 
     @Transactional(readOnly = true)
     public List<DailyHealthSummary> getDailySummary(String recordKey) {
-        return dailyHealthSummaryRepository.findByRecordKeyOrderByHealthDtDesc(recordKey);
+        // 1. Redis 캐시 조회
+        List<DailyHealthSummary> cached = redisCacheService.getDailySummary(recordKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        // 2. DB 조회
+        List<DailyHealthSummary> summaries = dailyHealthSummaryRepository.findByRecordKeyOrderByHealthDtDesc(recordKey);
+        
+        // 3. Redis 캐시 저장
+        if (!summaries.isEmpty()) {
+            redisCacheService.cacheDailySummary(recordKey, summaries);
+        }
+
+        return summaries;
     }
 
     @Transactional(readOnly = true)
     public List<MonthlyHealthSummary> getMonthlySummary(String recordKey) {
-        return monthlyHealthSummaryRepository.findByRecordKeyOrderByHealthDtDesc(recordKey);
+        // 1. Redis 캐시 조회
+        List<MonthlyHealthSummary> cached = redisCacheService.getMonthlySummary(recordKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        // 2. DB 조회
+        List<MonthlyHealthSummary> summaries = monthlyHealthSummaryRepository.findByRecordKeyOrderByHealthDtDesc(recordKey);
+        
+        // 3. Redis 캐시 저장
+        if (!summaries.isEmpty()) {
+            redisCacheService.cacheMonthlySummary(recordKey, summaries);
+        }
+
+        return summaries;
     }
 
     // 집계 데이터를 담는 내부 클래스

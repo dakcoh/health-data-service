@@ -30,6 +30,7 @@ public class HealthDataService {
     private final HealthEntryRepository healthEntryRepository;
     private final DataSourceRepository dataSourceRepository;
     private final HealthSummaryService healthSummaryService;
+    private final RedisCacheService redisCacheService;
     private final ObjectMapper objectMapper;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -108,10 +109,28 @@ public class HealthDataService {
 
         // 4. Daily/Monthly 집계 업데이트
         healthSummaryService.aggregateSummaries(request.getRecordkey(), entries);
+        
+        // 5. 캐시 무효화 (새 데이터 추가되었으므로)
+        redisCacheService.invalidateUserCache(userId);
+        redisCacheService.invalidateSummaryCache(request.getRecordkey());
     }
 
     @Transactional(readOnly = true)
     public List<HealthEntry> getHealthEntriesByUserId(Long userId) {
-        return healthEntryRepository.findByUserId(userId);
+        // 1. Redis 캐시 조회
+        List<HealthEntry> cached = redisCacheService.getHealthEntries(userId);
+        if (cached != null) {
+            return cached;
+        }
+
+        // 2. DB 조회
+        List<HealthEntry> entries = healthEntryRepository.findByUserId(userId);
+        
+        // 3. Redis 캐시 저장
+        if (!entries.isEmpty()) {
+            redisCacheService.cacheHealthEntries(userId, entries);
+        }
+
+        return entries;
     }
 }
