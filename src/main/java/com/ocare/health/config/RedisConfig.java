@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -21,10 +23,19 @@ import java.time.Duration;
 
 @Configuration
 @EnableCaching
-@EnableRedisIndexedHttpSession(maxInactiveIntervalInSeconds = 1800)
+@EnableRedisIndexedHttpSession
 public class RedisConfig {
 
     @Bean
+    @Primary
+    public ObjectMapper objectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return objectMapper;
+    }
+
+    @Bean("redisObjectMapper")
     public ObjectMapper redisObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
@@ -40,7 +51,7 @@ public class RedisConfig {
     }
 
     @Bean
-    public RedisSerializer<Object> redisSerializer(ObjectMapper redisObjectMapper) {
+    public RedisSerializer<Object> redisSerializer(@Qualifier("redisObjectMapper") ObjectMapper redisObjectMapper) {
         return new CustomRedisSerializer(redisObjectMapper);
     }
 
