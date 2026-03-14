@@ -47,7 +47,6 @@ public class AuthService {
                 .email(savedUser.getEmail())
                 .name(savedUser.getName())
                 .nickname(savedUser.getNickname())
-                .message("회원가입이 완료되었습니다")
                 .build();
     }
 
@@ -71,7 +70,6 @@ public class AuthService {
                 .email(user.getEmail())
                 .name(user.getName())
                 .nickname(user.getNickname())
-                .message("로그인되었습니다")
                 .build();
     }
 

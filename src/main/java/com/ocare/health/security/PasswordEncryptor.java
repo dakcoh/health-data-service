@@ -31,7 +31,7 @@ public class PasswordEncryptor {
         }
     }
 
-    public String decrypt(String encryptedPassword) {
+    private String decrypt(String encryptedPassword) {
         try {
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.DECRYPT_MODE, secretKey);

@@ -1,5 +1,6 @@
 package com.ocare.health.controller;
 
+import com.ocare.health.dto.ApiResponse;
 import com.ocare.health.dto.AuthResponse;
 import com.ocare.health.dto.LoginRequest;
 import com.ocare.health.dto.SignupRequest;
@@ -18,40 +19,40 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(
+    public ResponseEntity<ApiResponse<AuthResponse>> signup(
             @Valid @RequestBody SignupRequest request,
             HttpSession session) {
         AuthResponse response = authService.signup(request, session);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("회원가입 완료", response));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpSession session) {
         AuthResponse response = authService.login(request, session);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("로그인 완료", response));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(HttpSession session) {
+    public ResponseEntity<ApiResponse<Void>> logout(HttpSession session) {
         authService.logout(session);
-        return ResponseEntity.ok("로그아웃되었습니다");
+        return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다"));
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthResponse> getCurrentUser(HttpSession session) {
+    public ResponseEntity<ApiResponse<AuthResponse>> getCurrentUser(HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         String email = (String) session.getAttribute("email");
 
         if (userId == null) {
-            return ResponseEntity.status(401).build();
+            return ResponseEntity.status(401).body(ApiResponse.error("인증되지 않은 사용자입니다"));
         }
 
-        return ResponseEntity.ok(AuthResponse.builder()
+        AuthResponse authResponse = AuthResponse.builder()
                 .userId(userId)
                 .email(email)
-                .message("인증된 사용자입니다")
-                .build());
+                .build();
+        return ResponseEntity.ok(ApiResponse.success("인증된 사용자입니다", authResponse));
     }
 }
