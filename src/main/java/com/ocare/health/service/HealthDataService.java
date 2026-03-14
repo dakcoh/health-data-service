@@ -1,6 +1,5 @@
 package com.ocare.health.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ocare.health.domain.DataSource;
 import com.ocare.health.domain.HealthEntry;
 import com.ocare.health.domain.HealthRecord;
@@ -10,7 +9,6 @@ import com.ocare.health.repository.HealthEntryRepository;
 import com.ocare.health.repository.HealthRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,68 +29,76 @@ public class HealthDataService {
     private final DataSourceRepository dataSourceRepository;
     private final HealthSummaryService healthSummaryService;
     private final RedisCacheService redisCacheService;
-    private final ObjectMapper objectMapper;
+    private final HealthDataLoader healthDataLoader;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
 
     private LocalDateTime parseDateTime(String dateTimeStr) {
         try {
-            // ISO 8601 형식을 먼저 파싱
             return LocalDateTime.parse(dateTimeStr, ISO_FORMATTER);
         } catch (Exception e) {
-            // 기본 형식 시도
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         }
     }
 
     @Transactional
     public void loadJsonData(String fileName, Long userId) throws IOException {
-        ClassPathResource resource = new ClassPathResource("json/" + fileName);
-        HealthDataRequest request = objectMapper.readValue(resource.getInputStream(), HealthDataRequest.class);
+        HealthDataRequest request = healthDataLoader.loadFromFile(fileName);
 
-        // 1. HealthRecord 저장
-        HealthRecord healthRecord;
-        if (healthRecordRepository.existsByRecordKey(request.getRecordkey())) {
-            healthRecord = healthRecordRepository.findByRecordKey(request.getRecordkey())
+        HealthRecord healthRecord = saveOrGetHealthRecord(request.getRecordkey(), userId);
+        saveOrUpdateDataSource(request.getData().getSource(), healthRecord.getId());
+        List<HealthEntry> entries = saveHealthEntries(request.getData().getEntries(), userId, healthRecord.getId());
+        
+        healthSummaryService.aggregateSummaries(request.getRecordkey(), entries);
+        redisCacheService.invalidateUserCache(userId);
+        redisCacheService.invalidateSummaryCache(request.getRecordkey());
+    }
+
+    private HealthRecord saveOrGetHealthRecord(String recordKey, Long userId) {
+        if (healthRecordRepository.existsByRecordKey(recordKey)) {
+            HealthRecord record = healthRecordRepository.findByRecordKey(recordKey)
                     .orElseThrow(() -> new IllegalStateException("Record not found"));
-            log.info("기존 레코드 사용: {}", request.getRecordkey());
-        } else {
-            healthRecord = HealthRecord.builder()
-                    .userId(userId)
-                    .recordKey(request.getRecordkey())
-                    .build();
-            healthRecord = healthRecordRepository.save(healthRecord);
-            log.info("새 레코드 생성: {}", request.getRecordkey());
+            log.info("기존 레코드 사용: {}", recordKey);
+            return record;
+        }
+        
+        HealthRecord record = HealthRecord.builder()
+                .userId(userId)
+                .recordKey(recordKey)
+                .build();
+        healthRecordRepository.save(record);
+        log.info("새 레코드 생성: {}", recordKey);
+        return record;
+    }
+
+    private void saveOrUpdateDataSource(HealthDataRequest.Source source, Long recordId) {
+        if (source == null) {
+            return;
         }
 
-        // 2. DataSource 저장 또는 업데이트
-        if (request.getData().getSource() != null) {
-            HealthDataRequest.Source source = request.getData().getSource();
-            
-            DataSource dataSource = dataSourceRepository.findByRecordId(healthRecord.getId())
-                    .orElse(DataSource.builder()
-                            .recordId(healthRecord.getId())
-                            .build());
-            
-            dataSource.update(
-                    source.getMode(),
-                    source.getProduct() != null ? source.getProduct().getName() : null,
-                    source.getProduct() != null ? source.getProduct().getVender() : null,
-                    source.getName(),
-                    source.getType()
-            );
-            
-            dataSourceRepository.save(dataSource);
-            log.info("데이터 소스 저장/업데이트: {}", source.getName());
-        }
+        DataSource dataSource = dataSourceRepository.findByRecordId(recordId)
+                .orElse(DataSource.builder().recordId(recordId).build());
+        
+        dataSource.update(
+                source.getMode(),
+                source.getProduct() != null ? source.getProduct().getName() : null,
+                source.getProduct() != null ? source.getProduct().getVender() : null,
+                source.getName(),
+                source.getType()
+        );
+        
+        dataSourceRepository.save(dataSource);
+        log.info("데이터 소스 저장/업데이트: {}", source.getName());
+    }
 
-        // 3. HealthEntry 저장
-        List<HealthEntry> entries = new ArrayList<>();
-        for (HealthDataRequest.Entry entry : request.getData().getEntries()) {
+    private List<HealthEntry> saveHealthEntries(List<HealthDataRequest.Entry> entries, Long userId, Long recordId) {
+        List<HealthEntry> healthEntries = new ArrayList<>();
+        
+        for (HealthDataRequest.Entry entry : entries) {
             HealthEntry healthEntry = HealthEntry.builder()
                     .userId(userId)
-                    .recordId(healthRecord.getId())
+                    .recordId(recordId)
                     .periodFrom(parseDateTime(entry.getPeriod().getFrom()))
                     .periodTo(parseDateTime(entry.getPeriod().getTo()))
                     .steps(BigDecimal.valueOf(entry.getStepsAsDouble()))
@@ -101,32 +107,23 @@ public class HealthDataService {
                     .caloriesValue(BigDecimal.valueOf(entry.getCalories().getValue()))
                     .caloriesUnit(entry.getCalories().getUnit())
                     .build();
-            entries.add(healthEntry);
+            healthEntries.add(healthEntry);
         }
 
-        healthEntryRepository.saveAll(entries);
-        log.info("{}개의 엔트리 저장 완료", entries.size());
-
-        // 4. Daily/Monthly 집계 업데이트
-        healthSummaryService.aggregateSummaries(request.getRecordkey(), entries);
-        
-        // 5. 캐시 무효화 (새 데이터 추가되었으므로)
-        redisCacheService.invalidateUserCache(userId);
-        redisCacheService.invalidateSummaryCache(request.getRecordkey());
+        healthEntryRepository.saveAll(healthEntries);
+        log.info("{}개의 엔트리 저장 완료", healthEntries.size());
+        return healthEntries;
     }
 
     @Transactional(readOnly = true)
     public List<HealthEntry> getHealthEntriesByUserId(Long userId) {
-        // 1. Redis 캐시 조회
         List<HealthEntry> cached = redisCacheService.getHealthEntries(userId);
         if (cached != null) {
             return cached;
         }
 
-        // 2. DB 조회
         List<HealthEntry> entries = healthEntryRepository.findByUserId(userId);
         
-        // 3. Redis 캐시 저장
         if (!entries.isEmpty()) {
             redisCacheService.cacheHealthEntries(userId, entries);
         }
