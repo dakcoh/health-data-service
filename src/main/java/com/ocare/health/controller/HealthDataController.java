@@ -1,6 +1,7 @@
 package com.ocare.health.controller;
 
-import com.ocare.health.domain.HealthEntry;
+import com.ocare.health.dto.ApiResponse;
+import com.ocare.health.dto.HealthEntryDto;
 import com.ocare.health.exception.UnauthorizedException;
 import com.ocare.health.service.HealthDataService;
 import jakarta.servlet.http.HttpSession;
@@ -27,18 +28,21 @@ public class HealthDataController {
     }
 
     @PostMapping("/load/{fileName}")
-    public ResponseEntity<String> loadJsonData(
+    public ResponseEntity<ApiResponse<Void>> loadJsonData(
             @PathVariable String fileName,
             HttpSession session) throws IOException {
         Long userId = getUserIdFromSession(session);
         healthDataService.loadJsonData(fileName, userId);
-        return ResponseEntity.ok(fileName + " 데이터 로드 완료");
+        return ResponseEntity.ok(ApiResponse.success(fileName + " 데이터 로드 완료"));
     }
 
     @GetMapping("/entries")
-    public ResponseEntity<List<HealthEntry>> getHealthEntries(HttpSession session) {
+    public ResponseEntity<ApiResponse<List<HealthEntryDto>>> getHealthEntries(HttpSession session) {
         Long userId = getUserIdFromSession(session);
-        List<HealthEntry> entries = healthDataService.getHealthEntriesByUserId(userId);
-        return ResponseEntity.ok(entries);
+        List<HealthEntryDto> entries = healthDataService.getHealthEntriesByUserId(userId)
+                .stream()
+                .map(HealthEntryDto::from)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success("건강 데이터 조회 완료", entries));
     }
 }

@@ -14,8 +14,6 @@ import java.util.List;
 public class HealthDataRequest {
     private String recordkey;
     private Data data;
-    private String lastUpdate;
-    private String type;
 
     @Getter
     @NoArgsConstructor

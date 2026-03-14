@@ -28,9 +28,6 @@ public class HealthRecord {
     @Column(name = "record_key", nullable = false, unique = true, length = 36)
     private String recordKey;
 
-    @Column(columnDefinition = "TEXT")
-    private String memo;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
