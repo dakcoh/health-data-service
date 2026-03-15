@@ -52,4 +52,13 @@ public class HealthEntry {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public void update(BigDecimal steps, BigDecimal distanceValue, String distanceUnit,
+                       BigDecimal caloriesValue, String caloriesUnit) {
+        this.steps = steps;
+        this.distanceValue = distanceValue;
+        this.distanceUnit = distanceUnit;
+        this.caloriesValue = caloriesValue;
+        this.caloriesUnit = caloriesUnit;
+    }
 }

@@ -4,9 +4,11 @@ import com.ocare.health.domain.HealthEntry;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
 public interface HealthEntryRepository extends JpaRepository<HealthEntry, Long> {
     List<HealthEntry> findByUserId(Long userId);
+    List<HealthEntry> findByRecordIdAndPeriodFromAndPeriodTo(Long recordId, LocalDateTime periodFrom, LocalDateTime periodTo);
 }
