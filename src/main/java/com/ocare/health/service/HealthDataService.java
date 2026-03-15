@@ -46,7 +46,7 @@ public class HealthDataService {
     public void loadJsonData(String fileName, Long userId) throws IOException {
         HealthDataRequest request = healthDataLoader.loadFromFile(fileName);
 
-        HealthRecord healthRecord = saveOrGetHealthRecord(request.getRecordkey(), userId);
+        HealthRecord healthRecord = saveOrGetHealthRecord(request.getRecordkey(), userId, request.getData().getMemo());
         saveOrUpdateDataSource(request.getData().getSource(), healthRecord.getId());
         List<HealthEntry> entries = saveHealthEntries(request.getData().getEntries(), userId, healthRecord.getId());
         
@@ -55,7 +55,7 @@ public class HealthDataService {
         redisCacheService.invalidateSummaryCache(request.getRecordkey());
     }
 
-    private HealthRecord saveOrGetHealthRecord(String recordKey, Long userId) {
+    private HealthRecord saveOrGetHealthRecord(String recordKey, Long userId, String memo) {
         if (healthRecordRepository.existsByRecordKey(recordKey)) {
             HealthRecord record = healthRecordRepository.findByRecordKey(recordKey)
                     .orElseThrow(() -> new IllegalStateException("Record not found"));
@@ -66,6 +66,7 @@ public class HealthDataService {
         HealthRecord record = HealthRecord.builder()
                 .userId(userId)
                 .recordKey(recordKey)
+                .memo(memo)
                 .build();
         healthRecordRepository.save(record);
         log.info("새 레코드 생성: {}", recordKey);

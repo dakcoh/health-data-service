@@ -20,6 +20,7 @@ public class HealthDataRequest {
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Data {
+        private String memo;
         private List<Entry> entries;
         private Source source;
     }
