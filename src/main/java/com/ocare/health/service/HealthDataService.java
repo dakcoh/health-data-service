@@ -96,22 +96,41 @@ public class HealthDataService {
         List<HealthEntry> healthEntries = new ArrayList<>();
         
         for (HealthDataRequest.Entry entry : entries) {
-            HealthEntry healthEntry = HealthEntry.builder()
-                    .userId(userId)
-                    .recordId(recordId)
-                    .periodFrom(parseDateTime(entry.getPeriod().getFrom()))
-                    .periodTo(parseDateTime(entry.getPeriod().getTo()))
-                    .steps(BigDecimal.valueOf(entry.getStepsAsDouble()))
-                    .distanceValue(BigDecimal.valueOf(entry.getDistance().getValue()))
-                    .distanceUnit(entry.getDistance().getUnit())
-                    .caloriesValue(BigDecimal.valueOf(entry.getCalories().getValue()))
-                    .caloriesUnit(entry.getCalories().getUnit())
-                    .build();
+            LocalDateTime periodFrom = parseDateTime(entry.getPeriod().getFrom());
+            LocalDateTime periodTo = parseDateTime(entry.getPeriod().getTo());
+
+            HealthEntry healthEntry;
+            List<HealthEntry> existing = healthEntryRepository
+                    .findByRecordIdAndPeriodFromAndPeriodTo(recordId, periodFrom, periodTo);
+
+            if (!existing.isEmpty()) {
+                healthEntry = existing.get(0);
+                healthEntry.update(
+                        BigDecimal.valueOf(entry.getStepsAsDouble()),
+                        BigDecimal.valueOf(entry.getDistance().getValue()),
+                        entry.getDistance().getUnit(),
+                        BigDecimal.valueOf(entry.getCalories().getValue()),
+                        entry.getCalories().getUnit()
+                );
+            } else {
+                healthEntry = HealthEntry.builder()
+                        .userId(userId)
+                        .recordId(recordId)
+                        .periodFrom(periodFrom)
+                        .periodTo(periodTo)
+                        .steps(BigDecimal.valueOf(entry.getStepsAsDouble()))
+                        .distanceValue(BigDecimal.valueOf(entry.getDistance().getValue()))
+                        .distanceUnit(entry.getDistance().getUnit())
+                        .caloriesValue(BigDecimal.valueOf(entry.getCalories().getValue()))
+                        .caloriesUnit(entry.getCalories().getUnit())
+                        .build();
+            }
+
             healthEntries.add(healthEntry);
         }
 
         healthEntryRepository.saveAll(healthEntries);
-        log.info("{}개의 엔트리 저장 완료", healthEntries.size());
+        log.info("{}개의 엔트리 저장/업데이트 완료", healthEntries.size());
         return healthEntries;
     }
 

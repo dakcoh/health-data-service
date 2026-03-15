@@ -47,8 +47,8 @@ public class MonthlyHealthSummary {
     private LocalDateTime updatedAt;
 
     public void addData(BigDecimal steps, BigDecimal calories, BigDecimal distance) {
-        this.steps = this.steps.add(steps);
-        this.calories = this.calories.add(calories);
-        this.distance = this.distance.add(distance);
+        this.steps = steps;
+        this.calories = calories;
+        this.distance = distance;
     }
 }
